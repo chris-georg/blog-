@@ -10,33 +10,75 @@ document.addEventListener('DOMContentLoaded', function () {
     // Show the correct page based on URL
     if (page === 'single-post.html') {
         document.getElementById('single-post').classList.add('active');
-        // Load single post data here if needed
+        loadSinglePost();
     } else if (page === 'admin-login.html') {
         document.getElementById('admin-login').classList.add('active');
     } else if (page === 'admin-signup.html') {
         document.getElementById('admin-signup').classList.add('active');
+    } else if (page === 'admin-dashboard.html') {
+        document.getElementById('admin-dashboard').classList.add('active');
+        checkAdminAuth();
+        loadPostsForDashboard();
     } else if (page === 'create-post.html') {
         document.getElementById('create-post').classList.add('active');
+        checkAdminAuth();
     } else {
         document.getElementById('homepage').classList.add('active');
-        // Load posts on homepage
         fetchPosts();
     }
 
-            // Mobile menu toggle
-            const hamburger = document.querySelector('.hamburger');
-            const navLinks = document.querySelector('.nav-links');
+    // Mobile menu toggle
+    const hamburger = document.querySelector('.hamburger');
+    const navLinks = document.querySelector('.nav-links');
 
-            if (hamburger) {
-                hamburger.addEventListener('click', function() {
-                    navLinks.classList.toggle('active');
-                });
-            }
+    if (hamburger) {
+        hamburger.addEventListener('click', function() {
+            navLinks.classList.toggle('active');
+        });
+    }
 
-            // Load posts dynamically on homepage
-            if (page === '' || page === 'index.html') {
-                loadPosts();
+    // Function to check if admin is authenticated
+    function checkAdminAuth() {
+        fetch('/api/auth/check', {
+            method: 'GET',
+            credentials: 'include'
+        })
+        .then(res => {
+            if (!res.ok && (page === 'admin-dashboard.html' || page === 'create-post.html')) {
+                alert('Please login first');
+                window.location.href = 'admin-login.html';
             }
+        })
+        .catch(err => {
+            console.error('Auth check error:', err);
+        });
+    }
+
+    // Function to load single post
+    function loadSinglePost() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const postId = urlParams.get('id');
+        
+        if (postId) {
+            fetch(`/api/posts/${postId}`)
+                .then(res => res.json())
+                .then(post => {
+                    const postContent = document.getElementById('single-post-content');
+                    if (postContent) {
+                        postContent.innerHTML = `
+                            <h1>${post.title}</h1>
+                            <div class="post-meta">
+                                <span>By ${post.author}</span>
+                                <span>${new Date(post.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            ${post.imageUrl ? `<img src="${post.imageUrl}" alt="${post.title}" class="featured-image">` : ''}
+                            <div class="post-body">${post.content}</div>
+                        `;
+                    }
+                })
+                .catch(err => console.error('Error loading post:', err));
+        }
+    }
 
     // Function to fetch and display posts on homepage
     function fetchPosts() {
@@ -68,8 +110,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Function to load posts for admin dashboard
     function loadPostsForDashboard() {
-        fetch('/api/posts')
-            .then(res => res.json())
+        fetch('/api/posts', {
+            credentials: 'include'
+        })
+            .then(res => {
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        window.location.href = 'admin-login.html';
+                    }
+                    throw new Error('Not authorized');
+                }
+                return res.json();
+            })
             .then(posts => {
                 const postsList = document.getElementById('posts-list');
                 if (!postsList) return;
@@ -94,7 +146,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     `;
                 });
             })
-            .catch(err => console.error('Error loading posts for dashboard:', err));
+            .catch(err => {
+                console.error('Error loading posts for dashboard:', err);
+                if (err.message === 'Not authorized') {
+                    window.location.href = 'admin-login.html';
+                }
+            });
     }
 
     // Function to delete a post
@@ -106,7 +163,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }).then(res => {
                 if (res.ok) {
                     alert('Post deleted successfully!');
-                    loadPostsForDashboard(); // Reload posts after deletion
+                    if (page === 'admin-dashboard.html') {
+                        loadPostsForDashboard();
+                    } else {
+                        fetchPosts();
+                    }
+                } else if (res.status === 401) {
+                    alert('You are not authorized. Please login.');
+                    window.location.href = 'admin-login.html';
                 } else {
                     alert('Failed to delete post');
                 }
@@ -116,6 +180,9 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     }
+
+    // Make deletePost function globally available
+    window.deletePost = deletePost;
 
     // Admin login form submission
     const loginForm = document.getElementById('login-form');
@@ -135,13 +202,43 @@ document.addEventListener('DOMContentLoaded', function () {
             }).then(res => {
                 if (res.ok) {
                     alert('Login successful!');
-                    window.location.href = 'admin-dashboard.html'; // Redirect to dashboard after login
+                    window.location.href = 'admin-dashboard.html';
                 } else {
                     alert('Invalid username or password');
                 }
             }).catch(err => {
                 alert('Login failed');
                 console.error('Login error:', err);
+            });
+        });
+    }
+
+    // Admin signup form submission
+    const signupForm = document.getElementById('signup-form');
+    if (signupForm) {
+        signupForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const email = document.getElementById('email').value;
+
+            fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({ username, password, email })
+            }).then(res => {
+                if (res.ok) {
+                    alert('Signup successful! Please login.');
+                    window.location.href = 'admin-login.html';
+                } else {
+                    alert('Signup failed');
+                }
+            }).catch(err => {
+                alert('Signup failed');
+                console.error('Signup error:', err);
             });
         });
     }
@@ -189,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }).then(res => {
                 if (res.ok) {
                     alert('Post created successfully!');
-                    window.location.href = 'index.html';
+                    window.location.href = 'admin-dashboard.html';
                 } else if (res.status === 401) {
                     alert('You are not authorized. Please login.');
                     window.location.href = 'admin-login.html';

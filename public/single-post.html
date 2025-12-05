@@ -36,7 +36,7 @@
 
                 if (postId) {
                     // Fetch post data from API
-                    fetch(`http://127.0.0.1:5000/api/posts/${postId}`)
+                    fetch(`/api/posts/${postId}`)
                         .then(response => {
                             if (!response.ok) {
                                 throw new Error('Post not found');
