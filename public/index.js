@@ -17,11 +17,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('admin-signup').classList.add('active');
     } else if (page === 'admin-dashboard.html') {
         document.getElementById('admin-dashboard').classList.add('active');
-        checkAdminAuth();
         loadPostsForDashboard();
     } else if (page === 'create-post.html') {
         document.getElementById('create-post').classList.add('active');
-        checkAdminAuth();
+        // Auth will be checked when user tries to create post
     } else {
         document.getElementById('homepage').classList.add('active');
         fetchPosts();
@@ -34,23 +33,6 @@ document.addEventListener('DOMContentLoaded', function () {
     if (hamburger) {
         hamburger.addEventListener('click', function() {
             navLinks.classList.toggle('active');
-        });
-    }
-
-    // Function to check if admin is authenticated
-    function checkAdminAuth() {
-        fetch('/api/auth/check', {
-            method: 'GET',
-            credentials: 'include'
-        })
-        .then(res => {
-            if (!res.ok && (page === 'admin-dashboard.html' || page === 'create-post.html')) {
-                alert('Please login first');
-                window.location.href = 'admin-login.html';
-            }
-        })
-        .catch(err => {
-            console.error('Auth check error:', err);
         });
     }
 
@@ -116,9 +98,11 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(res => {
                 if (!res.ok) {
                     if (res.status === 401) {
+                        alert('Please login to access dashboard');
                         window.location.href = 'admin-login.html';
+                        return;
                     }
-                    throw new Error('Not authorized');
+                    throw new Error('Failed to load posts');
                 }
                 return res.json();
             })
@@ -148,9 +132,6 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .catch(err => {
                 console.error('Error loading posts for dashboard:', err);
-                if (err.message === 'Not authorized') {
-                    window.location.href = 'admin-login.html';
-                }
             });
     }
 
