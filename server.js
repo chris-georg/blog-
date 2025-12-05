@@ -40,10 +40,48 @@ app.use(session({
     saveUninitialized: false,
     cookie: { 
         maxAge: 24 * 60 * 60 * 1000,
-        sameSite: 'none',  // ADD THIS for cross-site cookies
-        secure: true       // Render uses HTTPS
+        sameSite: 'none',
+        secure: true
     }
 }));
+
+// Debug middleware
+app.use((req, res, next) => {
+    console.log('=== REQUEST DEBUG ===');
+    console.log('Path:', req.path);
+    console.log('Method:', req.method);
+    console.log('Session ID:', req.sessionID);
+    console.log('Session User ID:', req.session.userId || 'Not set');
+    console.log('Cookies:', req.headers.cookie || 'None');
+    console.log('=====================');
+    next();
+});
+
+// Test endpoint
+app.get('/api/session-test', (req, res) => {
+    console.log('=== SESSION TEST ===');
+    console.log('Session:', req.session);
+    
+    if (!req.session.testVisits) {
+        req.session.testVisits = 1;
+    } else {
+        req.session.testVisits += 1;
+    }
+    
+    req.session.save((err) => {
+        if (err) {
+            console.error('Session save error:', err);
+            return res.status(500).json({ error: 'Session save failed' });
+        }
+        
+        res.json({
+            sessionId: req.sessionID,
+            testVisits: req.session.testVisits,
+            userId: req.session.userId || 'No user',
+            message: 'Session test successful'
+        });
+    });
+});
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));

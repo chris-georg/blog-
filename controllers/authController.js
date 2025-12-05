@@ -2,7 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 
 exports.signup = async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, email } = req.body;
 
     if (!username || !password) {
         return res.status(400).json({ message: 'Please provide username and password' });
@@ -15,11 +15,31 @@ exports.signup = async (req, res) => {
             return res.status(409).json({ message: 'Username already taken.' });
         }
 
-        // Create new user (password will be hashed by the User model's pre-save hook)
-        const newUser = new User({ username, password });
+        // Create new user
+        const newUser = new User({ 
+            username, 
+            password,
+            email: email || `${username}@example.com`
+        });
+        
         await newUser.save();
 
-        res.status(201).json({ message: 'User created successfully.' });
+        // Auto-login after signup
+        req.session.userId = newUser._id;
+        req.session.username = newUser.username;
+        
+        req.session.save((err) => {
+            if (err) {
+                console.error('Session save error during signup:', err);
+                return res.status(500).json({ message: 'Signup successful but login failed' });
+            }
+            
+            res.status(201).json({ 
+                message: 'User created and logged in successfully.',
+                user: { id: newUser._id, username: newUser.username }
+            });
+        });
+
     } catch (error) {
         console.error('Signup error:', error);
         res.status(500).json({ message: 'Server error during signup.' });
@@ -34,45 +54,104 @@ exports.login = async (req, res) => {
     }
 
     try {
-        console.log('Login attempt for username:', username);
+        console.log('=== LOGIN ATTEMPT ===');
+        console.log('Username:', username);
 
         const user = await User.findOne({ username });
-        console.log('User found:', !!user);
-
+        
         if (!user) {
-            console.log('No user found with username:', username);
+            console.log('User not found:', username);
             return res.status(401).json({ message: "Invalid credentials" });
         }
+
+        console.log('User found:', user.username, 'ID:', user._id);
 
         const isMatch = await user.matchPassword(password);
-        console.log('Password match:', isMatch);
-        console.log('Entered password length:', password.length);
-        console.log('Stored hash length:', user.password.length);
-
+        
         if (!isMatch) {
-            console.log('Password does not match for user:', username);
+            console.log('Password mismatch for user:', username);
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
-        req.session.userId = user._id;
-        console.log('Session set for user ID:', user._id);
-        console.log('Session object:', req.session);
+        console.log('Password verified for user:', username);
 
-        return res.json({ message: "Login Successful" });
+        // Set session data
+        req.session.userId = user._id;
+        req.session.username = user.username;
+        req.session.isAdmin = user.isAdmin || false;
+        
+        console.log('Session data set - UserID:', req.session.userId);
+        console.log('Session ID:', req.sessionID);
+
+        // CRITICAL: Save session before sending response
+        req.session.save((err) => {
+            if (err) {
+                console.error('❌ Session save error:', err);
+                return res.status(500).json({ message: 'Login failed - session error' });
+            }
+            
+            console.log('✅ Session saved successfully');
+            console.log('✅ Login successful for:', user.username);
+            
+            // Send response AFTER session is saved
+            return res.json({ 
+                message: "Login Successful",
+                user: { 
+                    id: user._id, 
+                    username: user.username,
+                    isAdmin: user.isAdmin || false
+                }
+            });
+        });
 
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ message: `Server error` });
+        console.error('❌ Login error:', error);
+        res.status(500).json({ message: 'Server error during login' });
     }
 };
 
 exports.logout = (req, res) => {
-    req.session.destroy(err => {
+    console.log('=== LOGOUT ATTEMPT ===');
+    console.log('User logging out:', req.session.username || 'Unknown');
+    
+    req.session.destroy((err) => {
         if (err) {
-            console.error('Logout error:', err);
+            console.error('❌ Logout error:', err);
             return res.status(500).json({ message: 'Logout failed' });
         }
-        res.clearCookie('connect.sid');
+        
+        // Clear the session cookie
+        res.clearCookie('connect.sid', {
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none'
+        });
+        
+        console.log('✅ Logout successful');
         return res.json({ message: 'Logout successful' });
     });
+};
+
+exports.checkAuth = (req, res) => {
+    console.log('=== AUTH CHECK ===');
+    console.log('Session ID:', req.sessionID);
+    console.log('Session data:', req.session);
+    console.log('User ID in session:', req.session.userId);
+    
+    if (req.session.userId) {
+        res.json({ 
+            authenticated: true,
+            user: {
+                id: req.session.userId,
+                username: req.session.username,
+                isAdmin: req.session.isAdmin || false
+            }
+        });
+    } else {
+        res.status(401).json({ 
+            authenticated: false,
+            message: 'Not authenticated'
+        });
+    }
 };
