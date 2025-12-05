@@ -16,10 +16,13 @@ connectDB();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true}));
 app.use(session({
-    secret: 'your-secret-key',
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: 'false',
-    cookie: {secure: false }
+    cookie: { 
+        secure: process.env.NODE_ENV === 'production', // HTTPS in production
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
 }));
 
 app.use(cors({
@@ -36,7 +39,7 @@ app.get(/.*/, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-const PORT = process.env.port || 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })

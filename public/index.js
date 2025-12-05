@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Function to fetch and display posts on homepage
     function fetchPosts() {
-        fetch('http://127.0.0.1:5000/api/posts')
+        fetch('/api/posts')
             .then(res => res.json())
             .then(posts => {
                 const postsGrid = document.querySelector('.posts-grid');
@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Function to load posts for admin dashboard
     function loadPostsForDashboard() {
-        fetch('http://127.0.0.1:5000/api/posts')
+        fetch('/api/posts')
             .then(res => res.json())
             .then(posts => {
                 const postsList = document.getElementById('posts-list');
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Function to delete a post
     function deletePost(postId) {
         if (confirm('Are you sure you want to delete this post?')) {
-            fetch(`http://127.0.0.1:5000/api/posts/${postId}`, {
+            fetch(`/api/posts/${postId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             }).then(res => {
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
 
-            fetch('http://127.0.0.1:5000/api/auth/login', {
+            fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (logoutLink) {
         logoutLink.addEventListener('click', function (e) {
             e.preventDefault();
-            fetch('http://127.0.0.1:5000/api/auth/logout', {
+            fetch('/api/auth/logout', {
                 method: 'POST',
                 credentials: 'include'
             }).then(res => {
@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const content = document.getElementById('post-content').value;
             const imageUrl = document.getElementById('post-image').value;
 
-            fetch('http://127.0.0.1:5000/api/posts', {
+            fetch('/api/posts', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
